@@ -11,7 +11,7 @@ using namespace std;
 int main() {
 	//WINDOW
 	sf::RenderWindow window(sf::VideoMode(800, 600), "My First Game");
-	window.setFramerateLimit(120);
+	//	window.setFramerateLimit(60);
 
 	//Player Texture
 
@@ -79,23 +79,24 @@ int main() {
 	sf::Vector2f aimNormal;
 	sf::Vector2f velocity;
 
-	double deltatime = 0; //for finding duration of clock
-
-	double shotspeed = 0.000003; //time limit for shooting
-	double rainSpeed = 0.000006; //time limit for raining
-
-	double shot = 0;		//time ounter for shooting
+	long double deltatime = 0; //for finding duration of clock
+	double shot = 0;		//time counter for shooting
 	double rain = 0;		//time counter for raining
-	double timm = 0;
-	double timmSpeed = 0.0005;
-	double speed = 3.9;		//speed of falling shapes
-	long int  score = 0;
+	double chaser = 0;
+	double shotspeed = 0.09;		//time limit for shooting
+	double rainSpeed = 0.15;		//time limit for raining
+	double chaserSpeed = 1;		//time limit for chaser ghosts 
+	double speed = 0;
+	int score = 0;
 	srand(time(NULL));
 
 	bool lose = false;
 	bool pause = false;
+	sf::Clock clock;
 
 	while (window.isOpen()) {
+
+
 		sf::Event event;
 		while (window.pollEvent(event)) {
 			if (event.type == sf::Event::Closed)
@@ -104,15 +105,24 @@ int main() {
 				pause = true;
 			if (event.type == sf::Event::GainedFocus)
 				pause = false;
-		}
+		} // event loop
+
+
+		deltatime = clock.restart().asSeconds();
+
+		if (score <= 50) speed = 8 * deltatime * 56.2;		//speed of falling ghosts
+
 
 		// If Loosing Screen or pause
 		if (lose || pause) {
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::R)) {	//Reset the game
-				shotspeed = 0.000003; rainSpeed = 0.000006;
+
+				shotspeed = 0.09;	//time limit for shooting
+				rainSpeed = 0.15;	//time limit for raining
+				chaserSpeed = 1;		//time limit for chaser ghosts
+				speed = 8 * deltatime * 56.2;		//speed of falling ghosts
 				shot = 0; rain = 0; lose = false;
-				speed = 3.9; score = 0;
-				timmSpeed = 0.0005;
+				score = 0;
 				enemies.clear(); projectiles.clear();
 			}
 
@@ -133,27 +143,36 @@ int main() {
 			continue;
 		}
 
-		sf::Clock clock;
-		deltatime = clock.restart().asSeconds();
+		//======== INCREMENTING LIMITS ======================================================================
+
 		if (shot < shotspeed) shot += deltatime;
 		if (rain < rainSpeed) rain += deltatime;
-		if (timm < timmSpeed) timm += 5 * deltatime;
+		if (chaser < chaserSpeed) chaser += deltatime;
+
+		//===================================================================================================
+
+		//======== INCREASING DIFFICULTY ====================================================================
 
 		// Increase enemies every 40 points
 		if (score % 50 == 40) {
-			speed += 0.05;
-			rainSpeed -= 0.00000004;
+			speed += 0.1 * deltatime * 56.2;
+			if (rainSpeed > 0.03) rainSpeed -= 0.0005;
+
 		}
-		// decrease projectiles
+		//// decrease projectiles
 		if (score % 100 == 40) {
-			shotspeed += 0.00000006; timmSpeed -= 0.000005;
+			if (shotspeed < 0.2) shotspeed += 0.005;
 		}
+
+		//=====================================================================================================
 
 		//UPDATE
 
-		mousePos = player.getPosition();
 
-		//UPDATE PLAYER
+
+		//UPDATE PLAYER	
+
+		mousePos = player.getPosition();
 		player.setPosition(sf::Mouse::getPosition(window).x, window.getSize().y - 50.f);
 
 		if (player.getPosition().x > window.getSize().x - 40) {
@@ -166,22 +185,26 @@ int main() {
 
 		//================================================================================
 
-		if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && shot >= shotspeed) {
+		if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && shot > shotspeed) {
 			projectile.setPosition(player.getPosition());
 			projectiles.push_back(sf::CircleShape(projectile));
 			shot = 0;
+
 		}
+
 
 		// UPDATE ENEMIES
 
 		// UPDATE PROJECTILES
 
-		if (rain >= rainSpeed) {
-			if (timm >= timmSpeed) {
+		if (rain > rainSpeed) {
+
+			if (chaser > chaserSpeed) {
 				enemy.setFillColor(sf::Color(255, 0, 0, 128));
-				timm = 0;
+				chaser = 0;
 				enemy.setPosition(rand() % ((window.getSize().x)), 0);
 			}
+
 			else {
 				enemy.setFillColor(sf::Color(255, 255, 255, 255));
 				enemy.setPosition(rand() % ((window.getSize().x - 60)) + 30, 100);
@@ -191,16 +214,23 @@ int main() {
 			rain = 0;
 		}
 
-		for (int i = 0; i < enemies.size(); i++) {
+
+
+
+
+		;		for (int i = 0; i < enemies.size(); i++) {
 			enemyCenter = enemies[i].getPosition();
 			aimDir = mousePos - enemyCenter;
 			aimNormal = aimDir / sqrt(aimDir.x * aimDir.x + aimDir.y * aimDir.y);
-	
+			//cout << i << endl;
 			velocity.x = 0;
 
-			if (enemies[i].getFillColor() == sf::Color(255, 0, 0, 128))
-				velocity.x = aimNormal.x * float(speed), velocity.y = speed + 3;
+			if (enemies[i].getFillColor() == sf::Color(255, 0, 0, 128)) {
+				velocity.x = aimNormal.x * float(speed);
+				velocity.y = speed + 20 * deltatime * 56.2;
 
+
+			}
 			enemies[i].move(velocity.x, speed);
 
 			if (enemies[i].getPosition().y >= player.getPosition().y - 10.f) {
@@ -212,12 +242,13 @@ int main() {
 		//cout << aimNormal.x << " " << aimNormal.y << endl;
 
 		for (int i = 0; i < projectiles.size(); i++) {
-			projectiles[i].move(0, -4.f);
+			projectiles[i].move(0, -8.f * deltatime * 56.2);
 			if (projectiles[i].getPosition().y < 40)
 				projectiles.erase(projectiles.begin() + i);
 		}
 
-		// COLLISION:
+		//cout << fixed << setprecision (10) << deltatime << endl;
+		//COLLISION:
 
 		for (int i = 0; i < enemies.size(); i++)
 		{
